@@ -1,8 +1,9 @@
 import numpy as np
 from pymodaq.utils.daq_utils import ThreadCommand
-from pymodaq.utils.data import DataFromPlugins, DataToExport
+from pymodaq.utils.data import DataFromPlugins, DataToExport, Axis
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
 from pymodaq.utils.parameter import Parameter
+from time import perf_counter
 
 from pymodaq_plugins_teaching.hardware.keithley import Keithley2110
 
@@ -116,10 +117,31 @@ class DAQ_0DViewer_Keithley2110(DAQ_Viewer_base):
 
         # synchrone version (blocking function)
         # raise NotImplemented  # when writing your own plugin remove this line
-        data_tot = self.controller.get_reading()
+        Nbuffer = 20
+        data_tot = []
+        time = []
+        start_time = perf_counter()
+        for _ in range(Nbuffer):
+            data_tot.append(self.controller.get_reading())
+            time.append(perf_counter()-start_time)
+
+        data_array = np.array(data_tot)
+        mean = np.array([data_array.mean()])
+        time_array = np.array(time)
+
+        # data_tot = self.controller.get_reading() # to get one value is this line
         self.dte_signal.emit(DataToExport(name='myplugin',
-                                          data=[DataFromPlugins(name='Mock1', data=[np.array([data_tot])],
-                                                                dim='Data0D', labels=['volt'])]))
+                                          data=[DataFromPlugins(name='Buffer', data=[data_array],
+                                                                dim='Data1D', labels=['volt'],
+                                                                axes=[Axis(label='Time', units='s', data=time_array)
+                                                                      ]
+                                                                ),
+                                                DataFromPlugins(name='Mean', data=[mean],
+                                                                dim='Data0D', labels=['mean'])
+                                                ]
+                                          )
+                             )
+
         #########################################################
 
         # # asynchrone version (non-blocking function with callback)
